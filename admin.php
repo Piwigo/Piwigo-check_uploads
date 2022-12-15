@@ -188,6 +188,23 @@ SELECT
     }
   }
 
+  // now let's check if some files listed in the database are not available in the filesystem
+  $nb_missing = 0;
+
+  foreach (array_keys($db_paths) as $path)
+  {
+    if (!isset($fs_paths[$path]))
+    {
+      array_push($page['errors'], $path.' is in the database, not in the filesystem');
+      $nb_missing++;
+    }
+  }
+
+  if ($nb_missing > 0)
+  {
+    array_unshift($page['errors'], $nb_missing.' files are listed in the database, but not available in the filesystem');
+  }
+
   if ($nb_bad_checksum > 0)
   {
     array_unshift($page['errors'], $nb_bad_checksum.' index.htm files with unexpected checksum');
