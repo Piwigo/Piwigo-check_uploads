@@ -1,0 +1,1 @@
+Verifique o diretório de envio em busca de arquivos inesperados ou ausentes
