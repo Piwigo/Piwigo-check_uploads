@@ -1,0 +1,1 @@
+Zkontroluje adresář pro nahrávání, zda v něm nejsou neočekávané nebo chybějící soubory
