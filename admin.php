@@ -40,6 +40,8 @@ if (isset($_GET['action']) and 'restore' == $_GET['action'])
 check_status(ACCESS_WEBMASTER);
 check_input_parameter('action', $_GET, false, '/^(delete|restore)$/');
 
+load_language('plugin.lang', dirname(__FILE__).'/');
+
 // +-----------------------------------------------------------------------+
 // | Functions                                                             |
 // +-----------------------------------------------------------------------+
@@ -195,7 +197,7 @@ SELECT
       {
         if ('89e8a208e5f06c65e6448ddeb40ad879' != md5(file_get_contents($conf['upload_dir'].'/'.$path)))
         {
-          array_push($page['errors'], $path.' unexpected checksum');
+          array_push($page['errors'], l10n('%s unexpected checksum', $path));
           $nb_bad_checksum++;
         }
         continue;
@@ -205,14 +207,14 @@ SELECT
       {
         if (!unlink($conf['upload_dir'].'/'.$path))
         {
-          trigger_error('"'.$path.'" cannot be removed', E_USER_WARNING);
+          trigger_error(l10n('%s cannot be removed', $path), E_USER_WARNING);
           break;
         }
         $nb_deleted++;
       }
       else
       {
-        array_push($page['errors'], $path.' is not in the database');
+        array_push($page['errors'], l10n('%s is not in the database', $path));
         $nb_unexpected++;
       }
     }
@@ -245,7 +247,7 @@ SELECT
         else
         {
           $nb_restorable++;
-          $message .= ' (size "'.$available_derivative['size'].'" available in data cache)';
+          $message .= l10n(' (size "%s" available in data cache)', $available_derivative['size']);
         }
       }
 
@@ -259,7 +261,7 @@ SELECT
 
   if ($nb_missing > 0)
   {
-    array_unshift($page['errors'], $nb_missing.' files are listed in the database, but not available in the filesystem');
+    array_unshift($page['errors'], l10n('%d files are listed in the database, but not available in the filesystem', $nb_missing));
 
     if ($nb_restorable > 0)
     {
@@ -268,11 +270,12 @@ SELECT
         str_replace(
           'a href',
           'a class="icon-cw" href',
-          l10n(
-            '%d restorable photos from sizes cache. Quality is lower than original files. Prefer restoring from a backup. <a href="%s">Restore from sizes cache</a>',
-            $nb_restorable,
-            'admin.php?page=plugin-check_uploads&amp;action=restore'
-          )
+          l10n('%d restorable photos from sizes cache.', $nb_restorable)
+          .' '.l10n('Quality is lower than original files.')
+          .' '.l10n('Prefer restoring from a backup.')
+          .' <a href="admin.php?page=plugin-check_uploads&amp;action=restore">'
+          .l10n('Restore from sizes cache')
+          .'</a>',
         )
       );
     }
@@ -280,7 +283,7 @@ SELECT
 
   if ($nb_bad_checksum > 0)
   {
-    array_unshift($page['errors'], $nb_bad_checksum.' index.htm files with unexpected checksum');
+    array_unshift($page['errors'], l10n('%d index.htm files with unexpected checksum', $nb_bad_checksum));
   }
 
   if ($nb_unexpected > 0)
@@ -290,11 +293,10 @@ SELECT
       str_replace(
         'a href',
         'a class="icon-trash" href',
-        l10n(
-          '%d unexpected files <a href="%s">delete them all</a>',
-          $nb_unexpected,
-          'admin.php?page=plugin-check_uploads&amp;action=delete'
-          )
+        l10n('%d unexpected files.', $nb_unexpected)
+        .' <a href="admin.php?page=plugin-check_uploads&amp;action=delete">'
+        .l10n('Delete them all')
+        .'</a>'
         )
       );
   }
@@ -319,7 +321,7 @@ SELECT
   {
     array_push(
       $page['infos'],
-      'Well done! Everything seems good :-)'
+      l10n('Well done! Everything seems good :-)')
       );
   }
 }
@@ -333,6 +335,8 @@ $template->set_filenames(
     'plugin_admin_content' => dirname(__FILE__).'/admin.tpl'
     )
   );
+
+$template->assign('ADMIN_PAGE_TITLE', 'Check Uploads');
 
 // +-----------------------------------------------------------------------+
 // |                           sending html code                           |
