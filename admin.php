@@ -269,7 +269,7 @@ SELECT
           'a href',
           'a class="icon-cw" href',
           l10n(
-            '%d restorable photos from sizes cache. <a href="%s">Restore them all</a>',
+            '%d restorable photos from sizes cache. Quality is lower than original files. Prefer restoring from a backup. <a href="%s">Restore from sizes cache</a>',
             $nb_restorable,
             'admin.php?page=plugin-check_uploads&amp;action=restore'
           )
