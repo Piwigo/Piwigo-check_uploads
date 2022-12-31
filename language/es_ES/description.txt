@@ -1,0 +1,1 @@
+Comprueba el directorio de subidas buscando archivos inesperados o que falten
