@@ -1,0 +1,1 @@
+Controlla la presenza di file inattesi o file scomparsi all'interno della cartella di caricamento.
