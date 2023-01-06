@@ -1,0 +1,1 @@
+Skontrolujte, či sa v adresári na nahrávanie nenachádzajú neočakávané alebo chýbajúce súbory
