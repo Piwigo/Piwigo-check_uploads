@@ -267,16 +267,10 @@ SELECT
     {
       array_unshift(
         $page['errors'],
-        str_replace(
-          'a href',
-          'a class="icon-cw" href',
-          l10n('%d restorable photos from sizes cache.', $nb_restorable)
-          .' '.l10n('Quality is lower than original files.')
-          .' '.l10n('Prefer restoring from a backup.')
-          .' <a href="admin.php?page=plugin-check_uploads&amp;action=restore">'
-          .l10n('Restore from sizes cache')
-          .'</a>',
-        )
+        l10n('%d restorable photos from sizes cache.', $nb_restorable)
+        .' '.l10n('Quality is lower than original files.')
+        .' '.l10n('Prefer restoring from a backup.')
+        .' <a class="icon-cw" href="admin.php?page=plugin-check_uploads&amp;action=restore">'.l10n('Restore from sizes cache').'</a>'
       );
     }
   }
@@ -290,15 +284,9 @@ SELECT
   {
     array_unshift(
       $page['errors'],
-      str_replace(
-        'a href',
-        'a class="icon-trash" href',
-        l10n('%d unexpected files.', $nb_unexpected)
-        .' <a href="admin.php?page=plugin-check_uploads&amp;action=delete">'
-        .l10n('Delete them all')
-        .'</a>'
-        )
-      );
+      l10n('%d unexpected files.', $nb_unexpected)
+      .' <a class="icon-trash" href="admin.php?page=plugin-check_uploads&amp;action=delete">'.l10n('Delete them all').'</a>'
+    );
   }
 
   if ($nb_deleted > 0)
