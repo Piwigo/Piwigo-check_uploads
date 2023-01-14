@@ -1,0 +1,1 @@
+Sprawdź folder wysyłania pod kątem nieoczekiwanych lub brakujących plików
