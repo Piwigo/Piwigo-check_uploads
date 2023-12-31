@@ -205,10 +205,14 @@ SELECT
 
       if (isset($_GET['action']) and 'delete' == $_GET['action'])
       {
-        if (!unlink($conf['upload_dir'].'/'.$path))
+        $fullpath = $conf['upload_dir'].'/'.$path;
+        if (file_exists($fullpath))
         {
-          trigger_error(l10n('%s cannot be removed', $path), E_USER_WARNING);
-          break;
+          if (!unlink($fullpath))
+          {
+            trigger_error(l10n('%s cannot be removed', $path), E_USER_WARNING);
+            break;
+          }
         }
         $nb_deleted++;
       }
