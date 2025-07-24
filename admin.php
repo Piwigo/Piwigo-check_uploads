@@ -38,7 +38,7 @@ if (isset($_GET['action']) and 'restore' == $_GET['action'])
 // +-----------------------------------------------------------------------+
 
 check_status(ACCESS_WEBMASTER);
-check_input_parameter('action', $_GET, false, '/^(delete|restore)$/');
+check_input_parameter('action', $_GET, false, '/^(delete|restore|deduplicate)$/');
 
 load_language('plugin.lang', dirname(__FILE__).'/');
 
@@ -150,6 +150,23 @@ if (isset($_POST['submit']) or isset($_GET['action']))
 {
   // first we load paths from DB (database)
   $db_paths = array();
+  $duplicates = array();
+  $nb_deduplicated = 0;
+  $potential_unexpected_paths_by_deduplication = array();
+
+  $formats_of = array();
+  $query = '
+SELECT
+    image_id,
+    ext
+  FROM '.IMAGE_FORMAT_TABLE.'
+;';
+  $formats = query2array($query);
+
+  foreach ($formats as $format)
+  {
+    @$formats_of[ $format['image_id'] ][ $format['ext'] ] = 1;
+  }
 
   $query = '
 SELECT
@@ -157,6 +174,7 @@ SELECT
     path,
     representative_ext
   FROM '.IMAGES_TABLE.'
+  ORDER BY id ASC
 ;';
 
   // clean the list
@@ -166,19 +184,170 @@ SELECT
     {
       // echo '$image[path] = '.$image['path'].'<br>';
       $path = str_replace($conf['upload_dir'], '', $image['path']);
-      $db_paths[ltrim($path, '/')] = $image['id'];
+      $path = ltrim($path, '/');
+
+      if (isset($db_paths[$path]))
+      {
+        // we have a duplicate path
+        if (isset($_GET['action']) and 'deduplicate' == $_GET['action'])
+        {
+          if (!file_exists($image['path']))
+          {
+            array_push($page['errors'], l10n('[action=deduplicate] %s does not exists on filesystem, cannot be deduplicated', $path));
+          }
+          else
+          {
+            if (preg_match('/-([a-f0-9]{8})\./', $path, $matches))
+            {
+              $random_string = $matches[1];
+            }
+            else
+            {
+              die('unexpected file name : '.$path);
+            }
+
+            do
+            {
+              // we fake a new random string. We do not want to have 2 images sharing the same path
+              $new_random_string = substr(bin2hex(random_bytes(10)), 0, 8);
+              $new_fullpath = str_replace('-'.$random_string.'.', '-'.$new_random_string.'.', $image['path']);
+            }
+            while (file_exists($new_fullpath));
+
+            $new_path = ltrim(str_replace($conf['upload_dir'], '', $new_fullpath), '/');
+
+            if (copy($image['path'], $new_fullpath))
+            {
+              if (isset($image['representative_ext']))
+              {
+                $rep_oldpath = original_to_representative($image['path'], $image['representative_ext']);
+
+                if (!file_exists($rep_oldpath))
+                {
+                  array_push($page['errors'], l10n('[action=deduplicate] %s does not exists on filesystem, cannot be deduplicated', $rep_oldpath));
+                }
+                else
+                {
+                  $rep_newpath = original_to_representative($new_fullpath, $image['representative_ext']);
+
+                  if (!copy($rep_oldpath, $rep_newpath))
+                  {
+                    array_push($page['errors'], l10n('[action=deduplicate] failed to copy representative file %s to %s', $rep_oldpath, $rep_newpath));
+                  }
+                  else
+                  {
+                    $potential_unexpected_paths_by_deduplication[] = $rep_oldpath;
+
+                    array_push(
+                      $page['infos'],
+                      l10n(
+                        '[action=deduplicate] #%d (representative=%s) old_path=%s copied to new_path=%s',
+                        $image['id'],
+                        $image['representative_ext'],
+                        $rep_oldpath,
+                        $rep_newpath
+                      )
+                    );
+                  }
+                }
+              }
+
+              if (isset($formats_of[ $image['id'] ]))
+              {
+                foreach ($formats_of[ $image['id'] ] as $format_ext => $one)
+                {
+                  $format_oldpath = original_to_format($image['path'], $format_ext);
+
+                  if (!file_exists($format_oldpath))
+                  {
+                    array_push($page['errors'], l10n('[action=deduplicate] %s does not exists on filesystem, cannot be deduplicated', $format_oldpath));
+                  }
+                  else
+                  {
+                    $format_newpath = original_to_format($new_fullpath, $format_ext);
+
+                    if (!copy($format_oldpath, $format_newpath))
+                    {
+                      array_push($page['errors'], l10n('[action=deduplicate] failed to copy format file %s to %s', $format_oldpath, $format_newpath));
+                    }
+                    else
+                    {
+                      $potential_unexpected_paths_by_deduplication[] = $format_oldpath;
+
+                      array_push(
+                        $page['infos'],
+                        l10n(
+                          '[action=deduplicate] #%d (format=%s) old_path=%s copied to new_path=%s',
+                          $image['id'],
+                          $format_ext,
+                          $format_oldpath,
+                          $format_newpath
+                        )
+                      );
+                    }
+                  }
+                }
+              }
+
+              single_update(
+                IMAGES_TABLE,
+                array('path' => $new_fullpath),
+                array('id' => $image['id'])
+              );
+              $nb_deduplicated++;
+
+              array_push(
+                $page['infos'],
+                l10n('[action=deduplicate] #%d old_path=%s copied to new_path=%s', $image['id'], $path, $new_path)
+              );
+
+              $path = $new_path;
+            }
+          }
+        }
+        else
+        {
+          if (!isset($duplicates[$path]))
+          {
+            $duplicates[$path] = array($db_paths[$path]);
+          }
+
+          $duplicates[$path][] = $image['id'];
+        }
+      }
+
+      $db_paths[$path] = $image['id'];
 
       if (isset($image['representative_ext']))
       {
-        $filname_wo_ext = get_filename_wo_extension(basename($image['path']));
-        $rep_dir = dirname($path).'/pwg_representative';
-        $rep_path = $rep_dir.'/'.$filname_wo_ext.'.'.$image['representative_ext'];
-        $db_paths[ltrim($rep_path, '/')] = $image['id'];
+        $db_paths[original_to_representative($path, $image['representative_ext'])] = $image['id'];
+      }
+
+      if (isset($formats_of[ $image['id'] ]))
+      {
+        foreach ($formats_of[ $image['id'] ] as $format_ext => $one)
+        {
+          $db_paths[original_to_format($path, $format_ext)] = $image['id'];
+        }
       }
     }
   }
 
   // echo '<pre>$db_paths = '; print_r($db_paths); echo '</pre>';
+
+  // the deduplication might have generated unexpected files, let's remove them before showing any useless warning
+  foreach ($potential_unexpected_paths_by_deduplication as $fullpath)
+  {
+    $path = ltrim(str_replace($conf['upload_dir'], '', $fullpath), '/');
+
+    if (!isset($db_paths[$path]))
+    {
+      if (!unlink($fullpath))
+      {
+        array_push($page['errors'], l10n('[action=deduplicate] failed to remove useless file %s', $fullpath));
+      }
+    }
+  }
 
   // second, we load paths from FS (filesystem)
   $fs_paths = cu_get_fs($conf['upload_dir']);
@@ -279,6 +448,20 @@ SELECT
     }
   }
 
+  if (count($duplicates) > 0)
+  {
+    array_unshift(
+      $page['errors'],
+      l10n('%d duplicated paths', count($duplicates))
+      .' <a class="icon-clone" href="admin.php?page=plugin-check_uploads&amp;action=deduplicate">'.l10n('Deduplicate').'</a>'
+    );
+
+    foreach ($duplicates as $path => $image_ids)
+    {
+      array_push($page['errors'], l10n('path=%s is duplicated for %d images : #%s', $path, count($image_ids), implode(' #', $image_ids)));
+    }
+  }
+
   if ($nb_bad_checksum > 0)
   {
     array_unshift($page['errors'], l10n('%d index.htm files with unexpected checksum', $nb_bad_checksum));
@@ -298,6 +481,14 @@ SELECT
     array_unshift(
       $page['infos'],
       l10n('%d files deleted', $nb_deleted)
+      );
+  }
+
+  if ($nb_deduplicated > 0)
+  {
+    array_unshift(
+      $page['infos'],
+      l10n('%d files deduplicated', $nb_deduplicated)
       );
   }
 
